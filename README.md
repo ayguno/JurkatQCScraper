@@ -1,5 +1,9 @@
 # JurkatQCScraper
 
+See live:
+
+https://ozshiny.shinyapps.io/JurkatQCscraper/
+
 ## JurkatQCscraper is a comprehensive online analytics tool to monitor Mass Spectrometer Performance. It is build by using Rshiny package.
 
 - Mass Spectrometry users inject 1 ug tryptic Jurkat cell peptide mixture to instruments and run a 110 min gradient with a standardized LC-MS/MS run method. 
