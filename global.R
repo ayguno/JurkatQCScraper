@@ -7,7 +7,7 @@
 # Libraries to run the app are also launched here.
 # Also provides the initial access to the API-stored data to launch the ui definition.
 # Server.R provides a dynamic means of updating the most recent form of the API-stored
-# data, especially importnat in the event of serving mutiple users simultaneously.
+# data, especially important in the event of serving mutiple users simultaneously.
 ################################################################################
 
 
@@ -29,7 +29,7 @@ library(shiny)
 library(maptools)
 
 library(plotly)
-
+library(DT)
 library(colorspace)
 
 library(dplyr)
@@ -110,5 +110,17 @@ QM_report <- report[!is.na(report$DistinctPepsCSTotal.number_of.),]
 names(QM_report)[2:15] <- names(report_summary)[3:16] 
 
 
+##############################################################
+# Read the active.archive.rds from API 
+##############################################################
+token<- readRDS("droptoken.rds")
+drop_get("active.archive.rds",dtoken = token)
+drop_get("latest_active_archive_patrol.rds",dtoken = token)
 
-        
+active.archive <<- readRDS("active.archive.rds")
+latest_active_archive_patrol <<-readRDS("latest_active_archive_patrol.rds")
+
+unlink("active.archive.rds") #Delete after reading the archived report.
+unlink("latest_active_archive_patrol.rds")
+active.archive$date <- as.Date(active.archive$ctime)
+active.archive <- filter(active.archive, date > as.Date("2015-09-13"))
