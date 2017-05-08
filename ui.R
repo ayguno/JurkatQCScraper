@@ -16,7 +16,7 @@ library(shinydashboard)
 
 shinyUI( dashboardPage( 
         
-        dashboardHeader(title = "JurkatQC Scraper Version 0.3", titleWidth = 300),
+        dashboardHeader(title = "JurkatQC Scraper Version 0.1.0", titleWidth = 350),
        
                
        
@@ -28,7 +28,8 @@ shinyUI( dashboardPage(
                 menuItem("Welcome!",tabName = "welcome",icon = icon("thumbs-o-up"),badgeLabel = "start here",badgeColor = "blue"),
                 menuItem("Daily QC summary", tabName = "dailysummary", icon = icon("bar-chart")),
                 menuItem("Time-series monitoring", tabName = "timeseries", icon = icon("line-chart")),
-                menuItem("Current MS Conditions", tabName = "current", icon = icon("dashboard"),badgeLabel = "new", badgeColor = "green"),
+                menuItem("Current MS Conditions", tabName = "current", icon = icon("dashboard")),
+                menuItem("MS Downtime", tabName = "downtime", icon = icon("clock-o"), badgeLabel = "new", badgeColor = "green"),
                 menuItem("The latest QC",tabName = "thelatest", icon = icon("table")),
                 menuItem("Facts and Figures",tabName = "facts", icon = icon("users")),
                 menuItem("Instrument vs user analytics", tabName = "instrument_centric", icon = icon("cogs")),
@@ -81,6 +82,7 @@ shinyUI( dashboardPage(
 
                    h4("Use data analytics to monitor mass spectrometer performance"),
                    tags$hr(),
+                  
                    h5(icon("thumbs-o-up"),"Mass Spectrometry users inject
                       1 ug tryptic Jurkat cell peptide mixture to instruments and run a 110 min 
                       gradient with a standardized LC-MS/MS run method.",br(),br(),
@@ -91,9 +93,36 @@ shinyUI( dashboardPage(
                       Broad Proteomics servers to detect new Jurkat Quality Metrics,
                       provided that the raw files were searched in Spectrum Mill.",br(),br(),
                       icon("thumbs-o-up"),"JurkatQC Scraper archives Quality Metrics data,
-                      extracts useful LC_labels, time and user attributes, and present helpful data analytics.",br(),br(),
+                      extracts useful LC labels, time and user attributes, and present helpful data analytics.",br(),br(),
                       icon("thumbs-o-up"),"JurkatQC Scraper also provides a user interface to obtain, store and present
-                      mass spectrometry user comments and maintanence records.")
+                      mass spectrometry user comments and maintanence records.",br(),br(),
+                      icon("thumbs-o-up"),"Effective from Version 0.1.0, JurkatQC Scraper also monitors
+                      instrument active archive records to estimate Mass Spectrometer downtime. It also integrates
+                      the instruments' operational status with Jurkat QC quality metrics."),
+                  
+                   
+                   
+                   fluidRow(
+                   
+                   column(1,{}),                      
+                        
+                   actionLink("link_to_downtime",
+                              label = uiOutput("downtime_box"),width = 3),
+                      
+                   infoBox(title="Sourcecode",color = "purple",width = 4,
+                            icon = icon("github"), value = "Find us on GitHub!",subtitle = "Access the sourcecode",
+                            href = "https://github.com/ayguno/JurkatQCScraper"),
+                   
+                   actionLink("link_to_tutorial",
+                              label = uiOutput("tutorial_box"),width = 3),
+                   
+                   column(1,{}) 
+                   
+                   )
+                   
+                   
+                   
+                   
                    ),
 
                    
@@ -127,15 +156,11 @@ shinyUI( dashboardPage(
                    ),
                    
                    fluidRow(
-                           
+                           column(2,{}),
                            actionLink("link_to_thelatest2",
                                       label = uiOutput("comment_box"),width =3),
                            actionLink("link_to_support",
-                                      label = uiOutput("support_box"),width =2),
-                           valueBox(color = "purple",width = 4,
-                                    icon = icon("github"), value = "Find us on GitHub!",subtitle = "Access the most recent sourcecode",
-                                    href = "https://github.com/ayguno/JurkatQCScraper"
-                           )
+                                      label = uiOutput("support_box"),width =2)
                    )
                    
 
@@ -280,9 +305,10 @@ shinyUI( dashboardPage(
                 
                 # Fourth tab content
                 tabItem(tabName = "thelatest",
-                       box(title = "Detailed latest quality metrics record for each instrument.",
-                           width = 12, status = "primary", solidHeader = TRUE,
-                           htmlOutput("latestQC")
+                       box(title = "Detailed latest quality metrics record for each instrument",
+                        
+                         width = 12, status = "primary", solidHeader = TRUE,
+                          dataTableOutput("latestQC")
                        ),
                  
                       
@@ -320,13 +346,23 @@ shinyUI( dashboardPage(
                                   min = min(QM_report$date),width = 100
                         ),
                         h6("When you choose a new date, JurkatQC Scraper
-                                will display the latest QC, 
+                                will display the latest QC,
                                 as well as instrument comments
                                 recorded by that date."),
                         actionButton(inputId = "action4", label = "Monitor another date")
                     ),
                        
-                    uiOutput("Reactive_comments") 
+                    uiOutput("Reactive_comments"),
+                    
+                    box(title = "All quality metrics records for all instruments",width=12, status = "primary",
+                        solidHeader = TRUE,collapsible = TRUE,collapsed = FALSE, 
+                        
+                        selectInput("Instrument_choice_allQC",
+                                    label= " Choose an Instrument",
+                                    choices = unique(QM_report$instrument),
+                                    selected = "Franklin",width = 150),
+                        dataTableOutput("allQC")
+                    )
                                 
                 ),
                 
@@ -648,6 +684,15 @@ shinyUI( dashboardPage(
                         
                         box(id= "box",title = "Evolution of the JurkatQC Scraper",
                             status = "primary", width = 12,background = "navy",height = "100%",
+                            h3(icon("code-fork"),"Version 0.1.0"), hr(),
+                            h4(icon("thumbs-o-up"),"Incorporated the new feature for monitoring Mass Spectrometer
+                               Downtime and integrating JurkatQC information "),br(),
+                            h4(icon("thumbs-o-up"),"Updated the design of the Latest Quality Metrics Table, 
+                            also incorporated a new table that allows retrieval of all Quality Metrics records,
+                            for all instruments"),br(),
+                            h4(icon("thumbs-o-up"),"Fixed a bug in the LC dot plot due to the increasing number of
+                            LC instruments"),br(),
+                            
                             h3(icon("code-fork"),"Version 0.3"), hr(),
                             h4(icon("thumbs-o-up"),"Calibrated Distinct Peptide Gauges with the historical performance of each instrument"),br(),
                             h4(icon("thumbs-o-up"),"Included a color key to interpret peptide gauges"),br(),
@@ -679,9 +724,107 @@ shinyUI( dashboardPage(
                         )
                         
                         
-                )
+                ),
                 
+                tabItem(tabName = "tutorial",
+               
+                br(),
+               
                 
+                box(id= "box",title = "Watch the video tutorial to explore JurkatQC Scraper",
+                    status = "primary",background = "navy",height = "100%",width = 10,
+                tags$video(src="JurkatQCscraper_tutorial.m4v",
+                                                type = "video/m4v",width = 800, height = 400,
+                                                height = "700px", controls = "controls")
+                        
+                    ),
+                
+                box(id= "box",title = "Recommended internet browsers:", 
+                    status = "danger",background = "navy",height = "100%",width = 10,
+                   icon("firefox"),"Firefox","and", icon("chrome"),"Google chrome",
+                   "(some versions of Safari or Internet Explorer might not display the video properly).")
+                
+                ),
+                
+                # "downtime" tab
+                tabItem(tabName = "downtime",
+                        
+                        box(title = "Mass Spectrometer downtime and JurkatQC",
+                            width = 12, status = "primary",id="box",height = "100%",
+                            collapsible = TRUE, solidHeader = TRUE, background = "navy",
+                            
+                            plotOutput("downtime.QC"),
+                            h5(column(4,{}),"Raw File Acquistion Time (Format: Year-Month-Day)"),
+                            hr(),
+                            column(3,  
+                                   selectInput("Instrument_choice.downtime.QC",
+                                               label= " Choose an Instrument",
+                                               choices = unique(active.archive$instrument),
+                                               selected = "Franklin",width = 150),
+                                   selectInput(inputId = "downtime.QM", selected = "DistinctPeps_CS_Total_number_of",
+                                               label = "Select a quality metric:",
+                                               choices = names(QM_report)[2:15],width = 400),
+                                   
+                                   h5(icon("clock-o"),"Any time difference that is equal to or more than
+                                      5h between two raw files is counted as Mass Spectrometer downtime.")
+                                   
+                            ),
+                            column(6,
+                                   h5(icon("line-chart"),"This analytics tool is designed to provide time-series information
+                                      about the downtime or operational status of a given mass spectrometer along with 
+                                      JurkatQC measured in the same time window.",br(),br(),
+                                      icon("thumbs-o-up"),"Any time gap that is more than 5 hours between two consequtive
+                                      raw files is considered as DOWNTIME.",br(),br(),
+                                      icon("thumbs-o-up"),"You can explore the blocks of instrument downtime and overlay with 
+                                      quality metrics obtained from JurkatQC.", br(),br(),
+                                      icon("thumbs-o-up"),"Select an instrument to monitor operational status.",br(),br(),
+                                      icon("thumbs-o-up"),"Select a quality metric to monitor.",br(),br(),
+                                      icon("calendar"),"You can also select custom date ranges from the calendar provided on the right for your convenience.")
+                            ),
+                            column(3,
+                                   h5(icon("calendar"),"Use this calendar to choose a new date range."),
+                                   dateRangeInput("range.downtime.QC",label = NULL, min = min(active.archive$date),
+                                                  max = max(active.archive$date),start = min(active.archive$date),
+                                                  end = max(active.archive$date),width = 300),
+                                   h6("Focus on the data for the selected range"),
+                                   h5(icon("exclamation-triangle"),"Note that the instrument downtime is estimated
+                                      by hourly scan of ALL raw files in the proteomics active archive directory.")
+                                   
+                            )
+                            
+                            
+                        ),# End of downtime.QC box      
+                        
+                        box(title = "Mass Spectrometer ESTIMATED cumulative downtime report",
+                            width = 12, status = "primary",id="box",height = "100%",
+                            collapsible = TRUE, solidHeader = TRUE, background = "navy",
+                            
+                            plotlyOutput("cumulative.downtime"),
+                            hr(),
+                            
+                            h5(icon("calendar"),"Use this calendar to choose a new date range."),
+                            dateRangeInput("range.cumulative.downtime",label = NULL, min = min(active.archive$date),
+                                           max = max(active.archive$date),start = (Sys.Date()-30),
+                                           end = Sys.Date()),
+                            h5("Focus on the data for the selected range")
+                           
+                                
+                        ),
+                        
+                       
+
+                        box(title = "Mass Spectrometer active archive cumulative file size",
+                            width = 12, status = "primary",id="box",height = "100%",
+                            collapsible = TRUE, solidHeader = TRUE, background = "navy",
+                            
+                            plotlyOutput("cumulative.filesize")
+                            
+                            
+                        )
+                        
+                        
+                )# End of "downtime" tab
+                  
             )# End of tabItems structure      
         )  # End of dashboard body
         
