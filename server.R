@@ -172,6 +172,24 @@ withProgress({
                 saveRDS(user_counter,"user_counter.rds")
                 drop_upload("user_counter.rds",dtoken = token)# push back to dropbox
                 
+                ##############################################################
+                # Read the active.archive.rds from API 
+                ##############################################################
+                token<- readRDS("droptoken.rds")
+                drop_get("active.archive.rds",dtoken = token)
+                drop_get("latest_active_archive_patrol.rds",dtoken = token)
+                
+                active.archive <<- readRDS("active.archive.rds")
+                latest_active_archive_patrol <<-readRDS("latest_active_archive_patrol.rds")
+                
+                unlink("active.archive.rds") #Delete after reading the archived report.
+                unlink("latest_active_archive_patrol.rds")
+                active.archive$date <- as.Date(active.archive$ctime)
+                active.archive <- filter(active.archive, date > as.Date("2015-09-13"))
+                
+                
+                
+                
         }) },message = "Checking for the latest JurkatQC scan")
         
         
@@ -197,12 +215,12 @@ output$QC_size <-renderInfoBox({
         
         infoBox(title="Archived",value=paste(nrow(QM_report)," Jurkat QC records",sep = "")
                 ,subtitle="and still recording...",
-                 color = "purple", icon = icon("list-alt"),fill = TRUE)
+                 color = "purple", icon = icon("feed"),fill = TRUE)
 })        
 
 output$user_size <- renderInfoBox({
         user_count = sum(user_counter$users)
-        infoBox(title= "Proudly served:", value = paste(user_count," users",sep=""), 
+        infoBox(title= "Proudly served", value = paste(user_count," users",sep=""), 
                 subtitle = "since Jan 1st, 2017",
                 icon = icon("users"),color = "green", fill = TRUE)
 })
@@ -321,9 +339,32 @@ observeEvent(input$link_to_support, {
 
 #################
 
+#################
 
+output$tutorial_box <-renderUI({
+        
+        infoBox(title = "New!",icon = icon("film"),fill = TRUE,width = 3,
+                color = "green", value = "Watch tutorial",subtitle = "Get Started!")
+})
 
+observeEvent(input$link_to_tutorial, {
+        newvalue <- "tutorial"
+        updateTabsetPanel(session, "tabitems",selected= newvalue)
+})
 
+#################
+
+#################
+output$downtime_box <-renderUI({
+        
+        infoBox(title = "New!",icon = icon("clock-o"),fill = TRUE,width = 3,
+                color = "red", value = "Monitor MS downtime",subtitle = "Click Here!")
+})
+
+observeEvent(input$link_to_downtime, {
+        newvalue <- "downtime"
+        updateTabsetPanel(session, "tabitems",selected= newvalue)
+})
 
 ###############################################################################        
 # Actual computation for the first tab (motion plots)       
@@ -364,19 +405,23 @@ withProgress(expr = {
         QMy <- QM_report[,input$QM2]
         tx <-as.POSIXct(QM_report$time)
         
-        tendered <<- data.frame(QMy,Date_time = tx, Instrument = QM_report$instrument)
+        tendered <<- data.frame(QMy,Date_time = tx, Instrument = QM_report$instrument, 
+                                Raw.file= QM_report$File)
         names(tendered)[1] <<- input$QM2
         Qmetric <<- gsub("_"," ",names(tendered)[1])
         
         
         p <- ggplot(data = tendered, aes_string(x = "Date_time" , y = names(tendered)[1] ))+
+               
                 geom_point(aes_string(colour = "Instrument"), size = 0.8)+
+                
                 geom_line(aes_string(colour = "Instrument"))+labs(x="Date and time (EST)")+
                 scale_color_discrete()+
                 #scale_color_brewer(type= "qual" , palette = 2)+ # depreciated since we have more than 8 instruments to monitor now
                 theme(panel.background=element_rect(fill = "white",colour = "black"),
                       panel.border=element_rect(colour = "black", fill = NA))
                 
+      
         
         ggplotly(p)
         
@@ -414,7 +459,7 @@ output$Gauge_plot <- renderGvis({
                 for(i in seq_along(instrument_list)) {
                         
                         
-                        Gauge_report_temp <- Gauge_report %>% select(instrument,Most_recent_QC) %>%
+                        Gauge_report_temp <- Gauge_report %>% dplyr::select(instrument,Most_recent_QC) %>%
                                 filter(instrument == instrument_list[i])
                         
                         MAX <- as.numeric(format(Gauge_report$percentile_95[which(Gauge_report$instrument == instrument_list[i])],digits = 5))
@@ -552,13 +597,14 @@ output$Reactive_comments <-renderUI({
 
 
 
-reTab4<- eventReactive( c(input$action4,input$action8), { 
+reTab4 <- eventReactive(c(input$action4,input$action8),{ 
 
+       
 withProgress(expr = {        
         
 # Update the latest QC report to allow date-dependent changes in the latestQC tab:
 
-alt_date <<- date(format(input$alternativedate))
+alt_date <<- date(input$alternativedate)
 QM_rep <- QM_report %>% filter(date <= alt_date)        
 
 QM_rep <- arrange(QM_rep, instrument, desc(time), desc(File))
@@ -574,7 +620,7 @@ QM_rep$time <- as.character(QM_rep$time)
 temp3 <- merge(QM_rep,temp2, by= c("instrument","time","File" ), sort = F)
 temp3$time<- substr(temp3$time, 12,nchar(temp3$time)-3)
 
-latest <<- temp3 %>% select(instrument,MS_user,date,weekdays,time,File,MSMS_Spectra_Collected:number_of_Spectra_False)
+latest <<- temp3 %>% dplyr::select(instrument,MS_user,date,weekdays,time,File,MSMS_Spectra_Collected:number_of_Spectra_False)
 names(latest)[which(names(latest)== "time")] <<- "Time (EST)"
 names(latest)[which(names(latest)== "weekdays")] <<- "Day"
 latest$date <<- as.character(latest$date)
@@ -598,15 +644,57 @@ colnames(latest)[w] <<- "The_latest_mass_spectrometry_user_comment_recorded_by_t
 
 },message = "Preparing the latest QC report")
 
-
 },ignoreNULL = FALSE)
 
-output$latestQC <- renderGvis({
-        reTab4()
-        gvisTable(latest, options = list(height = 410, alternatingRowStyle = T,
-                                         width = 1100, frozenColumns = 5))
+
+
+
+
+observeEvent(c(input$action4,input$action8),{     
         
-})
+        isolate(reTab4())
+        
+output$latestQC <- DT::renderDataTable(
+        
+        latest, extensions = c('FixedColumns'),
+        options = list(scrollX = TRUE, scrollY= TRUE, paging= FALSE, 
+                       fixedColumns = list(leftColumns = 5, rightColumns = 0),
+                       searching = TRUE)
+        
+) 
+
+
+}, ignoreNULL = FALSE)
+
+
+
+reTab_allQC <- eventReactive(input$Instrument_choice_allQC,{
+        
+        instrument.allQC <- input$Instrument_choice_allQC
+        allQC.table.temp <- QM_report %>% filter(instrument == instrument.allQC)
+        allQC.table.temp <- arrange(allQC.table.temp, instrument, desc(time), desc(File))
+        allQC.table <<- allQC.table.temp %>% dplyr::select(instrument,MS_user,date,weekdays,time,File,MSMS_Spectra_Collected:number_of_Spectra_False)
+        
+},ignoreNULL =FALSE)
+
+
+observeEvent(input$Instrument_choice_allQC,{     
+        
+        isolate(reTab_allQC())
+        
+        output$allQC <- DT::renderDataTable(
+                
+                allQC.table, extensions = c('FixedColumns',"FixedHeader"),
+                options = list(scrollX = TRUE, scrollY= TRUE, paging= FALSE, fixedHeader = TRUE,
+                               fixedColumns = list(leftColumns = 5, rightColumns = 0),
+                               searching = TRUE)
+                
+        ) 
+        
+        
+}, ignoreNULL = FALSE)
+
+
 
 
 
@@ -1056,13 +1144,15 @@ reTab7_4 <- eventReactive(input$action13,{
                 
                 QM_selected <- as.character(input$QM_choice7_4)
                 
+                QM_report$LC_labels <- factor(QM_report$LC_labels)
+                QM_report$instrument <- factor(QM_report$instrument)
                 
                 LC_labels <- "LC_labels"
-                instrument <- "instrument"
+                
                 
                 p74 <- ggplot(data = QM_report, aes_string(y = QM_selected,x = LC_labels 
                                                            ))+
-                        geom_jitter(position = position_jitter(0.9),alpha=0.8,aes_string(colour=instrument))+
+                        geom_jitter(position = position_jitter(0.2),alpha=0.8,aes(colour=instrument))+
                         labs(fill="", x="  ")+
                         scale_fill_brewer(type= "qual" , palette = 2) +
                         theme(panel.background=element_rect(fill = "white",colour = "black"),
@@ -1136,11 +1226,212 @@ output$LC_MS_User <- renderPlotly(expr = {
 
 
 
+observeEvent(input$range.cumulative.downtime,{
+        
+        start.date <- date(format(input$range.cumulative.downtime)[1])
+        end.date <- date(format(input$range.cumulative.downtime)[2])
+        
+        temp.active.cumulative <<- active.archive %>% filter(date >= start.date & date <= end.date )
+        
+        temp.active.cumulative.summary <- temp.active.cumulative %>% group_by(instrument,status) %>%
+                summarise(cumulative.Downtime_Days = sum(time.difference_days)) %>% filter(status == "DOWNTIME")
+        
+        temp.active.cumulative.summary$instrument <- factor(temp.active.cumulative.summary$instrument)
+        
+        temp.active.cumulative.summary$instrument <- reorder(temp.active.cumulative.summary$instrument,
+                                                             temp.active.cumulative.summary$cumulative.Downtime_Days)
+        
+        output$cumulative.downtime <- renderPlotly({ 
+                
+                g <-ggplot(data = temp.active.cumulative.summary,aes(x = instrument, 
+                                                         y = cumulative.Downtime_Days))+
+                        ggtitle(label = paste0(" Mass Spectrometer cumulative downtime report between: ", as.character(start.date),
+                                               " and ",as.character(end.date) ))+
+                        ylab(label = "MS Downtime (Days)")+
+                        xlab(label = "Mass Spectrometer")+
+                        geom_bar(stat = "identity", fill = "navy")+
+                        theme(panel.background=element_rect(fill = "white",colour = "black"),
+                              panel.border=element_rect(colour = "black", fill = NA),
+                              plot.margin = margin(10,3,3,10, "pt"),
+                              axis.title = element_text(size = 14, face = "bold"),
+                              plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+                              axis.text.x = element_text(size = 12,face = "bold"),
+                              axis.text.y = element_text(size = 10,face = "bold"))+
+                        coord_flip()
+                
+                ggplotly(g)
+                
+                })
+        
+        
+})
 
 
+output$cumulative.filesize <- renderPlotly({
+        
+        isolate({
+          
+          instrument.list <- unique(active.archive$instrument)        
+          
+          temp.size.cumulative.summary <- NULL
+          
+          for(i in seq_along(instrument.list)){
+                  
+                  temp <- data.frame(active.archive %>% filter(instrument == instrument.list[i] & date > as.Date("2015-09-13")) %>%
+                          arrange(date) %>% group_by(date) %>% summarise(daily_size = sum(size/(2^20))))
+                  
+                  temp$instrument = instrument.list[i]
+                  
+                  cumulative_filesize <- NULL
+                  
+                  for(j in seq_along(temp$daily_size)){
+                          
+                          cumulative_filesize[j]<- sum(temp$daily_size[1:j])
+                  }
+                  
+                  temp$cumulative_filesize_MB <- cumulative_filesize
+                  
+                  temp.size.cumulative.summary <- rbind(temp.size.cumulative.summary,temp)                  
+          }           
+   })
+                  
+                  
+                  
+                  
+     g<- ggplot(data = temp.size.cumulative.summary, aes(x = date, y = cumulative_filesize_MB,
+                                                     color = instrument))+
+             geom_line(size =1.5)+
+             theme(panel.background=element_rect(fill = "white",colour = "black"),
+                   panel.border=element_rect(colour = "black", fill = NA),
+                   plot.margin = margin(10,3,3,10, "pt"),
+                   axis.title = element_text(size = 14, face = "bold"),
+                   plot.title = element_text(size = 14, face = "bold",hjust = 0.5),
+                   axis.text.x = element_text(size = 12,face = "bold"),
+                   axis.text.y = element_text(size = 10,face = "bold"))+
+             ggtitle(label = " Mass Spectrometer active archive total file size ")+
+             ylab(label = "Active archive total file size (MB)")+
+             xlab(label = "Time")
+                  
+          
+      
+        ggplotly(g)
+      
+        
+
+        
+        
+})
+
+observeEvent(input$Instrument_choice.downtime.QC,{
+        instrument.down <- input$Instrument_choice.downtime.QC
+        
+        
+        
+        temp.active.update <- active.archive %>% filter(instrument == instrument.down )
+        new.date.range <- temp.active.update$date
+        
+        if(max(new.date.range) <= Sys.Date() & (max(new.date.range)- min(new.date.range) >= 30)){
+                updateDateRangeInput(session = session,inputId = "range.downtime.QC",label = NULL,
+                                     min = min(new.date.range),
+                                     max = max(new.date.range),start = (max(new.date.range)-30),
+                                     end = max(new.date.range))
+                
+        }else if(max(new.date.range)- min(new.date.range) <= 30){
+                updateDateRangeInput(session = session,inputId = "range.downtime.QC",label = NULL,
+                                     min = min(new.date.range),
+                                     max = max(new.date.range),start = max(new.date.range),
+                                     end = min(new.date.range))
+                
+        }else{
+                updateDateRangeInput(session = session,inputId = "range.downtime.QC",label = NULL,
+                                     min = min(new.date.range),
+                                     max = max(new.date.range),start = (Sys.Date()-30),
+                                     end = Sys.Date())
+        }
+        
+       
+},ignoreNULL = FALSE)
 
 
-
+observeEvent(c(input$Instrument_choice.downtime.QC,input$range.downtime.QC,
+               input$downtime.QM),{ 
+        
+        
+        
+        isolate({
+                instrument.down <- input$Instrument_choice.downtime.QC
+                
+                if(instrument.down == "Hubble"){
+                        instrument.down.QC <- "Hubble1"
+                }else{
+                        instrument.down.QC = instrument.down
+                }
+                
+                start.date <- date(format(input$range.downtime.QC)[1])
+                end.date <- date(format(input$range.downtime.QC)[2])
+                QM <<- as.character(input$downtime.QM)
+                
+                temp.active <<- active.archive %>% filter(date >= start.date & date <= end.date & instrument == instrument.down )
+                
+                timeline <<- seq.Date(to = as.Date(max(temp.active$ctime)), from = as.Date(min(temp.active$ctime)),
+                                      length.out = 20)
+                
+                rect.x.min <<- min( as.numeric(temp.active$ctime))
+                rect.x.max <<- max(as.numeric(temp.active$ctime))
+                
+                QM_report_temp <<- QM_report %>% filter(date >= start.date & date <= end.date & instrument == instrument.down.QC )
+                
+                
+        })
+        
+        
+        w <- which(temp.active$status == "DOWNTIME")
+        down.rects.max.points <- as.numeric(temp.active$ctime[w])
+        down.rects.min.points <- as.numeric(temp.active$ctime[w+1])
+        
+        QMindex <- which(names(QM_report_temp) == QM)
+        
+        y.seq <- seq(from = min(QM_report[,QMindex],na.rm = T), to = max(QM_report[,QMindex],na.rm = T), 
+                     length.out = length(temp.active$ctime) )
+        
+        plotter <- function(){
+        par(mar=c(8,10,5,1))
+        plot(x = temp.active$ctime,y = y.seq , type = "n",
+             axes=F, xaxt="n", ylab = paste0(QM,"\n\n"), xlab = "",
+             main = paste("Mass Spectrometer Downtime v.s JurkatQC Report for ",
+                          instrument.down," between ",
+                          as.character(start.date), 
+                          " and ",as.character(end.date),sep = ""))
+        rect(rect.x.min , par("usr")[3],rect.x.max, par("usr")[4], col = 
+                     "lightgreen")
+        if(length(down.rects.max.points) > 0){
+                
+                for(i in seq_along(down.rects.max.points)){
+                        
+                        rect(down.rects.min.points[i], par("usr")[3],
+                             down.rects.max.points[i], par("usr")[4], 
+                             col = "navy",border = NA,density = -100)
+                }
+                
+        }
+        lines(x = QM_report_temp$time, y = QM_report_temp[,QMindex], lty =2, cex = 2, col ="red")
+        points(x = QM_report_temp$time, y = QM_report_temp[,QMindex], col = "red",
+               pch = 19, cex = 1.3)
+        
+        axis.POSIXct(side = 1,at=timeline,x= 1:20,format='%Y-%m-%d',labels=T,las=2)
+        axis(side = 2, at = round(seq(from=min(y.seq), to =max(y.seq), length.out = 5),0), las =2)
+        legend("topright",pch = 15, cex = 1, col = c("navy","lightgreen"), legend = c("Downtime","Operational"))
+        legend("topleft",pch = 19, cex = 1.3, col = "red", legend = "JurkatQC")
+        }
+        
+        output$downtime.QC <- renderPlot({
+                
+                print(plotter())
+                
+        })
+        
+        
+},ignoreNULL = FALSE)
 
 
 
