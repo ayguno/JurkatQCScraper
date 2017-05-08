@@ -13,6 +13,11 @@ https://ozshiny.shinyapps.io/JurkatQCscraper/
 - JurkatQC Scraper also provides a user interface to obtain, store and present mass spectrometry user comments and maintanence records.
 
 ## Evolution of the JurkatQC Scraper
+### Version 0.1.0
+- Incorporated the new feature for monitoring Mass Spectrometer Downtime and integrating JurkatQC information
+- Updated the design of the Latest Quality Metrics Table, also incorporated a new table that allows retrieval of all Quality Metrics records, for all instruments
+- Fixed a bug in the LC dot plot due to the increasing number of LC instruments
+
 ### Version 0.3
 - Calibrated Distinct Peptide Gauges with the historical performance of each instrument
 - Included a color key to interpret peptide gauges
